@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>GBF Daily Links Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<style>
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+    line-height: 1.6;
+    background: #f8f9fa;
+  }
+
+  h1 {
+    color: #2c3e50;
+    font-size: 2rem;
+  }
+
+  .link-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .link-item {
+    margin: 14px 0;
+    padding: 14px 18px;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: all 0.18s;
+  }
+
+  .link-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+  }
+
+  .link-item a {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .link-item a:hover {
+    text-decoration: underline;
+  }
+
+  .link-item.visited {
+    background: #f1f3f5;
+    opacity: 0.7;
+  }
+
+  .link-item.visited a {
+    color: #6c757d;
+    pointer-events: none;
+    cursor: default;
+  }
+
+  .item-label {
+    font-size: 0.9rem;
+    color: #495057;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .reset-info {
+    margin-top: 2.5rem;
+    color: #6c757d;
+    font-size: 0.95rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>GBF Daily Links</h1>
+<p>Each item is tracked separately — even if they point to the same URL<br>
+All tracking resets every day at **04:00 HKT**</p>
+
+<ul class="link-list" id="linkList"></ul>
+
+<div class="reset-info" id="resetInfo"></div>
+
+<script>
+// === CONFIGURATION - You can have duplicate URLs ===
+const LINKS = [
+  { label: "Slime", url: "https://game.granbluefantasy.jp/#quest/supporter/400181/4" },
+  { label: "mypage", url: "https://game.granbluefantasy.jp/#mypage" },
+];
+
+// === STORAGE KEYS (updated) ===
+const STORAGE_KEY = "GBF_daily_clicked";
+const LAST_RESET_KEY = "GBF_daily_last_reset";
+
+// === HKT Time Helpers ===
+function getHKTDate() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" }));
+}
+
+function getTodayResetKey() {
+  const hkt = getHKTDate();
+  return `${hkt.getFullYear()}-${String(hkt.getMonth()+1).padStart(2,'0')}-${String(hkt.getDate()).padStart(2,'0')}`;
+}
+
+function shouldReset() {
+  const todayKey = getTodayResetKey();
+  const lastReset = localStorage.getItem(LAST_RESET_KEY);
+  
+  if (!lastReset || lastReset !== todayKey) {
+    localStorage.setItem(LAST_RESET_KEY, todayKey);
+    localStorage.removeItem(STORAGE_KEY);
+    return true;
+  }
+  return false;
+}
+
+// === Main Logic ===
+function init() {
+  shouldReset(); // clears old data if new day
+
+  // Now we store array of indices instead of URLs
+  const clickedIndices = new Set(
+    JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")
+  );
+
+  const container = document.getElementById("linkList");
+  container.innerHTML = "";
+
+  LINKS.forEach((item, index) => {
+    const li = document.createElement("li");
+    li.className = "link-item";
+    
+    // Mark as visited if this specific item (by index) was clicked
+    if (clickedIndices.has(index)) {
+      li.classList.add("visited");
+    }
+
+    // Optional label above the link
+    if (item.label) {
+      const labelEl = document.createElement("span");
+      labelEl.className = "item-label";
+      labelEl.textContent = item.label;
+      li.appendChild(labelEl);
+    }
+
+    const a = document.createElement("a");
+    a.href = item.url;
+    a.textContent = item.url; // fallback display
+    // a.target = "_blank";
+    a.rel = "noopener noreferrer";
+
+    // Only track if not yet clicked
+    if (!clickedIndices.has(index)) {
+      a.addEventListener("click", () => {
+        clickedIndices.add(index);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...clickedIndices]));
+        li.classList.add("visited");
+      });
+    }
+
+    li.appendChild(a);
+    container.appendChild(li);
+  });
+
+  updateResetInfo();
+}
+
+function updateResetInfo() {
+  const hkt = getHKTDate();
+  const today = getTodayResetKey();
+  
+  const nextReset = new Date(hkt);
+  nextReset.setHours(4, 0, 0, 0);
+  
+  if (hkt.getHours() >= 4) {
+    nextReset.setDate(nextReset.getDate() + 1);
+  }
+
+  const diffMs = nextReset - hkt;
+  const hours = Math.floor(diffMs / 3600000);
+  const minutes = Math.floor((diffMs % 3600000) / 60000);
+
+  document.getElementById("resetInfo").textContent = 
+    `Next reset: 04:00 HKT (${hours}h ${minutes}min remaining)`;
+}
+
+// Start!
+init();
+setInterval(updateResetInfo, 60000); // update countdown every minute
+</script>
+</body>
+</html>
